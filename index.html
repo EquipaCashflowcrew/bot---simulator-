@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Trading Simulator — Prediction Markets</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #00ff88;
+    --accent2: #ff3366;
+    --accent3: #3366ff;
+    --text: #e8e8f0;
+    --muted: #666680;
+    --win: #00ff88;
+    --loss: #ff3366;
+    --mono: 'Space Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+- { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+background: var(–bg);
+color: var(–text);
+font-family: var(–sans);
+min-height: 100vh;
+overflow-x: hidden;
+}
+
+/* GRID BACKGROUND */
+body::before {
+content: ‘’;
+position: fixed;
+inset: 0;
+background-image:
+linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+background-size: 40px 40px;
+pointer-events: none;
+z-index: 0;
+}
+
+.container { max-width: 1100px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+/* HEADER */
+header {
+border-bottom: 1px solid var(–border);
+padding: 20px 0;
+position: sticky;
+top: 0;
+background: rgba(10,10,15,0.95);
+backdrop-filter: blur(12px);
+z-index: 100;
+}
+
+.header-inner {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 16px;
+}
+
+.logo {
+font-family: var(–mono);
+font-size: 13px;
+color: var(–accent);
+letter-spacing: 2px;
+text-transform: uppercase;
+}
+
+.badge {
+font-family: var(–mono);
+font-size: 10px;
+background: rgba(0,255,136,0.1);
+border: 1px solid rgba(0,255,136,0.3);
+color: var(–accent);
+padding: 4px 10px;
+border-radius: 2px;
+letter-spacing: 1px;
+}
+
+/* BANKROLL BAR */
+.bankroll-bar {
+background: var(–surface);
+border-bottom: 1px solid var(–border);
+padding: 16px 0;
+}
+
+.bankroll-inner {
+display: flex;
+align-items: center;
+gap: 40px;
+flex-wrap: wrap;
+}
+
+.stat-block { display: flex; flex-direction: column; gap: 4px; }
+
+.stat-label {
+font-family: var(–mono);
+font-size: 9px;
+color: var(–muted);
+letter-spacing: 2px;
+text-transform: uppercase;
+}
+
+.stat-value {
+font-family: var(–mono);
+font-size: 20px;
+font-weight: 700;
+color: var(–text);
+}
+
+.stat-value.pos { color: var(–win); }
+.stat-value.neg { color: var(–loss); }
+.stat-value.accent { color: var(–accent); }
+
+/* MAIN LAYOUT */
+.main {
+display: grid;
+grid-template-columns: 1fr 380px;
+gap: 24px;
+padding: 32px 0;
+align-items: start;
+}
+
+@media (max-width: 800px) {
+.main { grid-template-columns: 1fr; }
+}
+
+/* PANELS */
+.panel {
+background: var(–surface);
+border: 1px solid var(–border);
+border-radius: 4px;
+overflow: hidden;
+}
+
+.panel-header {
+padding: 16px 20px;
+border-bottom: 1px solid var(–border);
+display: flex;
+align-items: center;
+justify-content: space-between;
+}
+
+.panel-title {
+font-family: var(–mono);
+font-size: 11px;
+color: var(–muted);
+letter-spacing: 2px;
+text-transform: uppercase;
+}
+
+.panel-body { padding: 20px; }
+
+/* MARKET CARDS */
+.markets-list { display: flex; flex-direction: column; gap: 12px; }
+
+.market-card {
+background: var(–surface2);
+border: 1px solid var(–border);
+border-radius: 4px;
+padding: 16px;
+cursor: pointer;
+transition: all 0.15s ease;
+position: relative;
+overflow: hidden;
+}
+
+.market-card::before {
+content: ‘’;
+position: absolute;
+left: 0; top: 0; bottom: 0;
+width: 3px;
+background: var(–accent3);
+opacity: 0;
+transition: opacity 0.15s;
+}
+
+.market-card:hover { border-color: rgba(0,255,136,0.3); }
+.market-card:hover::before { opacity: 1; }
+.market-card.selected { border-color: var(–accent); }
+.market-card.selected::before { opacity: 1; background: var(–accent); }
+
+.market-question {
+font-size: 14px;
+font-weight: 600;
+margin-bottom: 12px;
+line-height: 1.4;
+}
+
+.market-meta {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 12px;
+}
+
+.market-price {
+display: flex;
+align-items: center;
+gap: 8px;
+}
+
+.price-yes {
+font-family: var(–mono);
+font-size: 13px;
+color: var(–win);
+}
+
+.price-no {
+font-family: var(–mono);
+font-size: 13px;
+color: var(–loss);
+}
+
+.price-bar {
+width: 80px;
+height: 6px;
+background: rgba(255,51,102,0.3);
+border-radius: 3px;
+overflow: hidden;
+}
+
+.price-bar-fill {
+height: 100%;
+background: var(–win);
+border-radius: 3px;
+transition: width 0.3s ease;
+}
+
+.market-volume {
+font-family: var(–mono);
+font-size: 10px;
+color: var(–muted);
+}
+
+.market-days {
+font-family: var(–mono);
+font-size: 10px;
+color: var(–muted);
+background: var(–surface);
+padding: 3px 8px;
+border-radius: 2px;
+}
+
+/* TRADE FORM */
+.form-group { margin-bottom: 20px; }
+
+.form-label {
+font-family: var(–mono);
+font-size: 10px;
+color: var(–muted);
+letter-spacing: 1.5px;
+text-transform: uppercase;
+display: block;
+margin-bottom: 8px;
+}
+
+.form-input {
+width: 100%;
+background: var(–surface2);
+border: 1px solid var(–border);
+border-radius: 4px;
+padding: 10px 14px;
+color: var(–text);
+font-family: var(–mono);
+font-size: 14px;
+outline: none;
+transition: border-color 0.15s;
+}
+
+.form-input:focus { border-color: var(–accent); }
+
+.form-input[type=“range”] {
+padding: 0;
+accent-color: var(–accent);
+cursor: pointer;
+height: 4px;
+margin-top: 8px;
+}
+
+.range-labels {
+display: flex;
+justify-content: space-between;
+margin-top: 4px;
+}
+
+.range-label {
+font-family: var(–mono);
+font-size: 9px;
+color: var(–muted);
+}
+
+.direction-buttons {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 8px;
+}
+
+.dir-btn {
+padding: 12px;
+border-radius: 4px;
+border: 1px solid var(–border);
+background: var(–surface2);
+color: var(–muted);
+font-family: var(–mono);
+font-size: 12px;
+cursor: pointer;
+transition: all 0.15s;
+letter-spacing: 1px;
+}
+
+.dir-btn:hover { border-color: var(–text); color: var(–text); }
+.dir-btn.active-yes { border-color: var(–win); background: rgba(0,255,136,0.1); color: var(–win); }
+.dir-btn.active-no { border-color: var(–loss); background: rgba(255,51,102,0.1); color: var(–loss); }
+
+/* KELLY DISPLAY */
+.kelly-box {
+background: var(–surface2);
+border: 1px solid var(–border);
+border-radius: 4px;
+padding: 16px;
+margin-bottom: 16px;
+}
+
+.kelly-row {
+display: flex;
+justify-content: space-between;
+align-items: center;
+padding: 6px 0;
+border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.kelly-row:last-child { border-bottom: none; }
+
+.kelly-key {
+font-family: var(–mono);
+font-size: 10px;
+color: var(–muted);
+}
+
+.kelly-val {
+font-family: var(–mono);
+font-size: 12px;
+color: var(–text);
+}
+
+.kelly-val.good { color: var(–win); }
+.kelly-val.warn { color: #ffaa00; }
+.kelly-val.bad { color: var(–loss); }
+
+/* VERDICT */
+.verdict {
+border-radius: 4px;
+padding: 12px 16px;
+margin-bottom: 16px;
+font-family: var(–mono);
+font-size: 11px;
+letter-spacing: 0.5px;
+line-height: 1.5;
+}
+
+.verdict.approved {
+background: rgba(0,255,136,0.08);
+border: 1px solid rgba(0,255,136,0.3);
+color: var(–win);
+}
+
+.verdict.blocked {
+background: rgba(255,51,102,0.08);
+border: 1px solid rgba(255,51,102,0.3);
+color: var(–loss);
+}
+
+.verdict.neutral {
+background: rgba(255,255,255,0.03);
+border: 1px solid var(–border);
+color: var(–muted);
+}
+
+/* SUBMIT BUTTON */
+.submit-btn {
+width: 100%;
+padding: 14px;
+border-radius: 4px;
+border: none;
+font-family: var(–mono);
+font-size: 12px;
+letter-spacing: 2px;
+text-transform: uppercase;
+cursor: pointer;
+transition: all 0.15s;
+}
+
+.submit-btn.enabled {
+background: var(–accent);
+color: #000;
+font-weight: 700;
+}
+
+.submit-btn.enabled:hover { opacity: 0.85; transform: translateY(-1px); }
+.submit-btn.disabled {
+background: var(–surface2);
+color: var(–muted);
+cursor: not-allowed;
+border: 1px solid var(–border);
+}
+
+/* POSITIONS TABLE */
+.positions-table { width: 100%; border-collapse: collapse; }
+
+.positions-table th {
+font-family: var(–mono);
+font-size: 9px;
+color: var(–muted);
+letter-spacing: 1.5px;
+text-transform: uppercase;
+padding: 8px 12px;
+text-align: left;
+border-bottom: 1px solid var(–border);
+}
+
+.positions-table td {
+font-family: var(–mono);
+font-size: 12px;
+padding: 12px 12px;
+border-bottom: 1px solid rgba(255,255,255,0.04);
+vertical-align: middle;
+}
+
+.pos-badge {
+display: inline-block;
+padding: 2px 8px;
+border-radius: 2px;
+font-size: 10px;
+}
+
+.pos-badge.yes-badge {
+background: rgba(0,255,136,0.1);
+color: var(–win);
+border: 1px solid rgba(0,255,136,0.2);
+}
+
+.pos-badge.no-badge {
+background: rgba(255,51,102,0.1);
+color: var(–loss);
+border: 1px solid rgba(255,51,102,0.2);
+}
+
+.resolve-btn {
+padding: 4px 10px;
+border-radius: 2px;
+border: 1px solid var(–border);
+background: transparent;
+color: var(–muted);
+font-family: var(–mono);
+font-size: 10px;
+cursor: pointer;
+transition: all 0.15s;
+margin-right: 4px;
+}
+
+.resolve-btn:hover { border-color: var(–text); color: var(–text); }
+.resolve-btn.win:hover { border-color: var(–win); color: var(–win); }
+.resolve-btn.lose:hover { border-color: var(–loss); color: var(–loss); }
+
+/* TRADE LOG */
+.log-list { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
+
+.log-item {
+display: flex;
+align-items: center;
+justify-content: space-between;
+padding: 10px 12px;
+background: var(–surface2);
+border-radius: 4px;
+gap: 12px;
+}
+
+.log-question {
+font-size: 12px;
+flex: 1;
+color: var(–text);
+white-space: nowrap;
+overflow: hidden;
+text-overflow: ellipsis;
+}
+
+.log-pnl {
+font-family: var(–mono);
+font-size: 12px;
+font-weight: 700;
+white-space: nowrap;
+}
+
+.log-pnl.pos { color: var(–win); }
+.log-pnl.neg { color: var(–loss); }
+
+/* PERFORMANCE CHART */
+.chart-area {
+height: 120px;
+position: relative;
+overflow: hidden;
+}
+
+canvas { width: 100%; height: 100%; }
+
+/* EMPTY STATE */
+.empty-state {
+text-align: center;
+padding: 40px 20px;
+color: var(–muted);
+font-family: var(–mono);
+font-size: 11px;
+letter-spacing: 1px;
+}
+
+/* RESET */
+.reset-btn {
+font-family: var(–mono);
+font-size: 10px;
+color: var(–muted);
+background: transparent;
+border: 1px solid var(–border);
+padding: 4px 12px;
+border-radius: 2px;
+cursor: pointer;
+transition: all 0.15s;
+letter-spacing: 1px;
+}
+
+.reset-btn:hover { border-color: var(–loss); color: var(–loss); }
+
+/* TOAST */
+.toast {
+position: fixed;
+bottom: 32px;
+right: 32px;
+padding: 12px 20px;
+border-radius: 4px;
+font-family: var(–mono);
+font-size: 12px;
+z-index: 1000;
+transform: translateY(80px);
+opacity: 0;
+transition: all 0.25s ease;
+pointer-events: none;
+}
+
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast.win-toast { background: rgba(0,255,136,0.15); border: 1px solid var(–win); color: var(–win); }
+.toast.loss-toast { background: rgba(255,51,102,0.15); border: 1px solid var(–loss); color: var(–loss); }
+.toast.info-toast { background: rgba(51,102,255,0.15); border: 1px solid var(–accent3); color: var(–accent3); }
+
+/* TABS */
+.tabs { display: flex; border-bottom: 1px solid var(–border); }
+.tab {
+font-family: var(–mono);
+font-size: 10px;
+letter-spacing: 1.5px;
+text-transform: uppercase;
+padding: 12px 16px;
+cursor: pointer;
+color: var(–muted);
+border-bottom: 2px solid transparent;
+transition: all 0.15s;
+background: none;
+border-top: none;
+border-left: none;
+border-right: none;
+}
+.tab:hover { color: var(–text); }
+.tab.active { color: var(–accent); border-bottom-color: var(–accent); }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.divider { height: 1px; background: var(–border); margin: 16px 0; }
+
+.info-row {
+display: flex;
+justify-content: space-between;
+padding: 6px 0;
+font-family: var(–mono);
+font-size: 11px;
+}
+
+.info-key { color: var(–muted); }
+.info-val { color: var(–text); }
+</style>
+
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="header-inner">
+      <div class="logo">▸ PAPER TRADING SIM</div>
+      <div style="display:flex;gap:12px;align-items:center;">
+        <div class="badge" id="memory-badge">💾 SEM DADOS</div>
+        <button class="reset-btn" onclick="resetSimulator()">↺ RESET</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="bankroll-bar">
+  <div class="container">
+    <div class="bankroll-inner">
+      <div class="stat-block">
+        <span class="stat-label">Bankroll</span>
+        <span class="stat-value accent" id="bankroll-display">€1.000,00</span>
+      </div>
+      <div class="stat-block">
+        <span class="stat-label">P&L Total</span>
+        <span class="stat-value" id="pnl-display">€0,00</span>
+      </div>
+      <div class="stat-block">
+        <span class="stat-label">Win Rate</span>
+        <span class="stat-value" id="winrate-display">—</span>
+      </div>
+      <div class="stat-block">
+        <span class="stat-label">Trades</span>
+        <span class="stat-value" id="trades-display">0</span>
+      </div>
+      <div class="stat-block">
+        <span class="stat-label">Drawdown</span>
+        <span class="stat-value" id="drawdown-display">0,0%</span>
+      </div>
+      <div class="stat-block">
+        <span class="stat-label">Brier Score</span>
+        <span class="stat-value" id="brier-display">—</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="main">
+
+```
+<!-- LEFT COLUMN -->
+<div style="display:flex;flex-direction:column;gap:24px;">
+
+  <!-- MARKETS -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Mercados Disponíveis</span>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--muted);" id="market-count">8 MERCADOS · ABR 2026</span>
+    </div>
+    <div class="panel-body">
+      <div class="markets-list" id="markets-list"></div>
+    </div>
+  </div>
+
+  <!-- POSITIONS -->
+  <div class="panel">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('positions')">Posições Abertas</button>
+      <button class="tab" onclick="switchTab('history')">Histórico</button>
+      <button class="tab" onclick="switchTab('performance')">Performance</button>
+    </div>
+
+    <div class="tab-panel active" id="tab-positions">
+      <div style="overflow-x:auto;">
+        <table class="positions-table">
+          <thead>
+            <tr>
+              <th>Mercado</th>
+              <th>Dir.</th>
+              <th>Entrada</th>
+              <th>Valor</th>
+              <th>Ganho Pot.</th>
+              <th>Resolver</th>
+            </tr>
+          </thead>
+          <tbody id="positions-tbody">
+            <tr><td colspan="6"><div class="empty-state">Nenhuma posição aberta</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-history">
+      <div class="panel-body">
+        <div class="log-list" id="log-list">
+          <div class="empty-state">Nenhum trade fechado ainda</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-performance">
+      <div class="panel-body">
+        <div class="chart-area">
+          <canvas id="perf-chart"></canvas>
+        </div>
+        <div class="divider"></div>
+        <div id="perf-stats">
+          <div class="info-row"><span class="info-key">Win Rate</span><span class="info-val" id="p-winrate">—</span></div>
+          <div class="info-row"><span class="info-key">Profit Factor</span><span class="info-val" id="p-pf">—</span></div>
+          <div class="info-row"><span class="info-key">Brier Score</span><span class="info-val" id="p-brier">—</span></div>
+          <div class="info-row"><span class="info-key">Maior Ganho</span><span class="info-val" id="p-bestwin">—</span></div>
+          <div class="info-row"><span class="info-key">Maior Perda</span><span class="info-val" id="p-bestloss">—</span></div>
+          <div class="info-row"><span class="info-key">P&L Médio</span><span class="info-val" id="p-avgpnl">—</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RIGHT COLUMN — TRADE FORM -->
+<div style="display:flex;flex-direction:column;gap:24px;">
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Fazer Trade</span>
+    </div>
+    <div class="panel-body">
+
+      <div id="selected-market-info" style="margin-bottom:20px;padding:12px;background:var(--surface2);border-radius:4px;border:1px solid var(--border);">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px;">MERCADO SELECIONADO</div>
+        <div id="selected-market-name" style="font-size:13px;color:var(--muted);">← Seleciona um mercado à esquerda</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Direção</label>
+        <div class="direction-buttons">
+          <button class="dir-btn" id="btn-yes" onclick="selectDir('yes')">✓ YES</button>
+          <button class="dir-btn" id="btn-no" onclick="selectDir('no')">✗ NO</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Tua Probabilidade Estimada: <span id="prob-display" style="color:var(--accent);">50%</span></label>
+        <input type="range" class="form-input" id="prob-slider" min="1" max="99" value="50" oninput="updateCalcs()">
+        <div class="range-labels">
+          <span class="range-label">1%</span>
+          <span class="range-label">50%</span>
+          <span class="range-label">99%</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Valor a Apostar (€)</label>
+        <input type="number" class="form-input" id="bet-amount" value="25" min="1" oninput="updateCalcs()">
+      </div>
+
+      <div class="kelly-box">
+        <div class="kelly-row">
+          <span class="kelly-key">Edge detectado</span>
+          <span class="kelly-val" id="k-edge">—</span>
+        </div>
+        <div class="kelly-row">
+          <span class="kelly-key">Valor Esperado (EV)</span>
+          <span class="kelly-val" id="k-ev">—</span>
+        </div>
+        <div class="kelly-row">
+          <span class="kelly-key">Kelly Fracionado (25%)</span>
+          <span class="kelly-val" id="k-kelly">—</span>
+        </div>
+        <div class="kelly-row">
+          <span class="kelly-key">Tamanho sugerido</span>
+          <span class="kelly-val" id="k-suggested">—</span>
+        </div>
+        <div class="kelly-row">
+          <span class="kelly-key">Ganho potencial</span>
+          <span class="kelly-val" id="k-gain">—</span>
+        </div>
+      </div>
+
+      <div class="verdict neutral" id="verdict-box">
+        Seleciona um mercado e define os parâmetros para ver a análise de risco.
+      </div>
+
+      <button class="submit-btn disabled" id="trade-btn" onclick="placeTrade()">
+        COLOCAR TRADE
+      </button>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Como Funciona</span>
+    </div>
+    <div class="panel-body" style="font-size:13px;line-height:1.7;color:var(--muted);">
+      <p><span style="color:var(--accent);">1.</span> Seleciona um mercado</p>
+      <p><span style="color:var(--accent);">2.</span> Escolhe YES ou NO</p>
+      <p><span style="color:var(--accent);">3.</span> Define a tua probabilidade estimada</p>
+      <p><span style="color:var(--accent);">4.</span> O bot calcula o Kelly e o risco</p>
+      <p><span style="color:var(--accent);">5.</span> Coloca o trade (só aprovado se edge > 4%)</p>
+      <p><span style="color:var(--accent);">6.</span> Resolve o resultado quando souberes</p>
+      <div class="divider"></div>
+      <p style="font-size:11px;font-family:var(--mono);">Meta: Win Rate > 60% | Brier Score &lt; 0.25</p>
+    </div>
+  </div>
+</div>
+```
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────
+// MEMÓRIA PERSISTENTE (localStorage)
+// ─────────────────────────────────────────
+const STORAGE_KEY = 'pmbot_state_v1';
+
+const STATE_DEFAULT = {
+  bankroll: 1000,
+  bankrollPeak: 1000,
+  positions: [],
+  history: [],
+  selectedMarket: null,
+  selectedDir: null,
+  nextId: 1,
+  criadoEm: new Date().toISOString()
+};
+
+function guardarEstado() {
+  try {
+    const toSave = {
+      bankroll: state.bankroll,
+      bankrollPeak: state.bankrollPeak,
+      positions: state.positions,
+      history: state.history,
+      nextId: state.nextId,
+      criadoEm: state.criadoEm,
+      guardadoEm: new Date().toISOString()
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+  } catch(e) { console.warn('Erro ao guardar estado:', e); }
+}
+
+function carregarEstado() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { ...STATE_DEFAULT };
+    const saved = JSON.parse(raw);
+    return {
+      ...STATE_DEFAULT,
+      ...saved,
+      selectedMarket: null,
+      selectedDir: null
+    };
+  } catch(e) {
+    console.warn('Erro ao carregar estado:', e);
+    return { ...STATE_DEFAULT };
+  }
+}
+
+let state = carregarEstado();
+
+const MARKETS = [
+  { id: 1, question: "Fed mantém taxas sem alteração em junho 2026?", yesPrice: 0.93, volume: 41000, days: 52, category: "🏦 Economia" },
+  { id: 2, question: "EUA e Irão vão ter reunião diplomática antes de 28 abr?", yesPrice: 0.69, volume: 18000, days: 3, category: "🌍 Geopolítica" },
+  { id: 3, question: "Anthropic tem o melhor modelo de IA no final de abril?", yesPrice: 0.87, volume: 18000, days: 6, category: "🤖 Tecnologia" },
+  { id: 4, question: "Real Madrid vai ganhar a Champions League 2026?", yesPrice: 0.28, volume: 22000, days: 30, category: "⚽ Futebol" },
+  { id: 5, question: "Bitcoin acima de $100k antes de 31 maio 2026?", yesPrice: 0.35, volume: 52000, days: 36, category: "₿ Cripto" },
+  { id: 6, question: "Estreito de Ormuz volta à normalidade antes de 31 maio?", yesPrice: 0.34, volume: 9800, days: 36, category: "🛢️ Energia" },
+  { id: 7, question: "Fed vai cortar juros pelo menos 1x em 2026?", yesPrice: 0.60, volume: 31000, days: 250, category: "🏦 Economia" },
+  { id: 8, question: "Brasil: Lula vai ganhar eleições presidenciais 2026?", yesPrice: 0.40, volume: 22000, days: 180, category: "🗳️ Política" },
+];
+
+// ─────────────────────────────────────────
+// RENDER MARKETS
+// ─────────────────────────────────────────
+function renderMarkets() {
+  const list = document.getElementById('markets-list');
+  list.innerHTML = MARKETS.map(m => `
+    <div class="market-card ${state.selectedMarket?.id === m.id ? 'selected' : ''}" onclick="selectMarket(${m.id})">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="font-family:var(--mono);font-size:9px;color:var(--muted);background:var(--surface);padding:2px 8px;border-radius:2px;">${m.category}</span>
+      </div>
+      <div class="market-question">${m.question}</div>
+      <div class="market-meta">
+        <div class="market-price">
+          <span class="price-yes">YES ${(m.yesPrice*100).toFixed(0)}¢</span>
+          <span class="price-no">NO ${((1-m.yesPrice)*100).toFixed(0)}¢</span>
+          <div class="price-bar"><div class="price-bar-fill" style="width:${m.yesPrice*100}%"></div></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="market-volume">Vol: ${m.volume.toLocaleString('pt-PT')}</span>
+          <span class="market-days">${m.days}d</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function selectMarket(id) {
+  state.selectedMarket = MARKETS.find(m => m.id === id);
+  renderMarkets();
+  document.getElementById('selected-market-name').textContent = state.selectedMarket.question;
+  document.getElementById('selected-market-name').style.color = 'var(--text)';
+  updateCalcs();
+}
+
+// ─────────────────────────────────────────
+// DIRECTION
+// ─────────────────────────────────────────
+function selectDir(dir) {
+  state.selectedDir = dir;
+  document.getElementById('btn-yes').className = `dir-btn ${dir === 'yes' ? 'active-yes' : ''}`;
+  document.getElementById('btn-no').className = `dir-btn ${dir === 'no' ? 'active-no' : ''}`;
+  updateCalcs();
+}
+
+// ─────────────────────────────────────────
+// CALCULATIONS
+// ─────────────────────────────────────────
+function updateCalcs() {
+  const probSlider = document.getElementById('prob-slider');
+  const betAmount = parseFloat(document.getElementById('bet-amount').value) || 0;
+  const p_model = parseFloat(probSlider.value) / 100;
+
+  document.getElementById('prob-display').textContent = `${probSlider.value}%`;
+
+  if (!state.selectedMarket || !state.selectedDir) {
+    setVerdictNeutral();
+    return;
+  }
+
+  const m = state.selectedMarket;
+  const p_market = state.selectedDir === 'yes' ? m.yesPrice : (1 - m.yesPrice);
+  const edge = p_model - p_market;
+
+  // Kelly
+  const q = 1 - p_model;
+  const b = (1 - p_market) / p_market;
+  const f_star = Math.max(0, (p_model * b - q) / b);
+  const f_frac = f_star * 0.25;
+  const kelly_suggested = Math.min(state.bankroll * f_frac, state.bankroll * 0.05);
+
+  // EV
+  const ev = p_model * b - (1 - p_model);
+
+  // Potential gain
+  const gain = betAmount * b;
+
+  // Update displays
+  const edgeEl = document.getElementById('k-edge');
+  edgeEl.textContent = `${(edge * 100).toFixed(1)}%`;
+  edgeEl.className = `kelly-val ${edge > 0.04 ? 'good' : edge > 0 ? 'warn' : 'bad'}`;
+
+  const evEl = document.getElementById('k-ev');
+  evEl.textContent = ev.toFixed(4);
+  evEl.className = `kelly-val ${ev > 0 ? 'good' : 'bad'}`;
+
+  document.getElementById('k-kelly').textContent = `${(f_frac * 100).toFixed(1)}% do bankroll`;
+  document.getElementById('k-suggested').textContent = `€${kelly_suggested.toFixed(2)}`;
+  document.getElementById('k-gain').textContent = `€${gain.toFixed(2)}`;
+
+  // Verdict & button
+  const btn = document.getElementById('trade-btn');
+  const verdict = document.getElementById('verdict-box');
+
+  const maxPos = state.bankroll * 0.05;
+  const drawdown = state.bankrollPeak > 0 ? (state.bankrollPeak - state.bankroll) / state.bankrollPeak : 0;
+
+  let blocked = false;
+  let reasons = [];
+
+  if (edge <= 0.04) { blocked = true; reasons.push(`Edge ${(edge*100).toFixed(1)}% < 4% mínimo`); }
+  if (ev <= 0) { blocked = true; reasons.push('Valor esperado negativo'); }
+  if (betAmount > maxPos) { blocked = true; reasons.push(`€${betAmount} > máximo €${maxPos.toFixed(2)} (5%)`); }
+  if (betAmount <= 0) { blocked = true; reasons.push('Valor inválido'); }
+  if (drawdown >= 0.08) { blocked = true; reasons.push('Drawdown > 8% — parado!'); }
+
+  if (blocked) {
+    verdict.className = 'verdict blocked';
+    verdict.innerHTML = `🔴 BLOQUEADO<br>${reasons.map(r => `· ${r}`).join('<br>')}`;
+    btn.className = 'submit-btn disabled';
+    btn.disabled = true;
+  } else {
+    verdict.className = 'verdict approved';
+    verdict.innerHTML = `🟢 APROVADO · Edge ${(edge*100).toFixed(1)}% · EV ${ev.toFixed(3)}<br>· Tamanho sugerido: €${kelly_suggested.toFixed(2)}`;
+    btn.className = 'submit-btn enabled';
+    btn.disabled = false;
+  }
+}
+
+// ─────────────────────────────────────────
+// PLACE TRADE
+// ─────────────────────────────────────────
+function placeTrade() {
+  const m = state.selectedMarket;
+  const dir = state.selectedDir;
+  const betAmount = parseFloat(document.getElementById('bet-amount').value);
+  const p_model = parseFloat(document.getElementById('prob-slider').value) / 100;
+  const p_market = dir === 'yes' ? m.yesPrice : (1 - m.yesPrice);
+  const b = (1 - p_market) / p_market;
+  const potentialGain = betAmount * b;
+
+  if (betAmount > state.bankroll) {
+    showToast('Saldo insuficiente!', 'info');
+    return;
+  }
+
+  const position = {
+    id: state.nextId++,
+    marketId: m.id,
+    question: m.question,
+    direction: dir,
+    entryPrice: p_market,
+    p_model: p_model,
+    betAmount: betAmount,
+    potentialGain: potentialGain,
+    timestamp: new Date().toLocaleTimeString('pt-PT')
+  };
+
+  state.positions.push(position);
+  state.bankroll -= betAmount;
+  guardarEstado();
+  updateHeader();
+  renderPositions();
+  showToast(`Trade colocado: €${betAmount.toFixed(2)} em ${dir.toUpperCase()}`, 'info');
+}
+
+// ─────────────────────────────────────────
+// RESOLVE TRADE
+// ─────────────────────────────────────────
+function resolvePosition(posId, won) {
+  const pos = state.positions.find(p => p.id === posId);
+  if (!pos) return;
+
+  const pnl = won ? pos.potentialGain : -pos.betAmount;
+  state.bankroll += won ? pos.betAmount + pos.potentialGain : 0;
+
+  if (state.bankroll > state.bankrollPeak) state.bankrollPeak = state.bankroll;
+
+  state.history.unshift({
+    ...pos,
+    won,
+    pnl,
+    resolvedAt: new Date().toLocaleTimeString('pt-PT')
+  });
+
+  state.positions = state.positions.filter(p => p.id !== posId);
+  guardarEstado();
+  updateHeader();
+  renderPositions();
+  renderHistory();
+  updatePerformance();
+
+  const emoji = won ? '✓ GANHOU' : '✗ PERDEU';
+  const type = won ? 'win' : 'loss';
+  showToast(`${emoji} · ${won ? '+' : ''}€${pnl.toFixed(2)}`, type);
+}
+
+// ─────────────────────────────────────────
+// RENDER POSITIONS
+// ─────────────────────────────────────────
+function renderPositions() {
+  const tbody = document.getElementById('positions-tbody');
+  if (state.positions.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state">Nenhuma posição aberta</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = state.positions.map(p => `
+    <tr>
+      <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.question.substring(0, 30)}...</td>
+      <td><span class="pos-badge ${p.direction}-badge">${p.direction.toUpperCase()}</span></td>
+      <td>${(p.entryPrice*100).toFixed(0)}¢</td>
+      <td>€${p.betAmount.toFixed(2)}</td>
+      <td style="color:var(--win);">+€${p.potentialGain.toFixed(2)}</td>
+      <td>
+        <button class="resolve-btn win" onclick="resolvePosition(${p.id}, true)">✓ WIN</button>
+        <button class="resolve-btn lose" onclick="resolvePosition(${p.id}, false)">✗ LOSS</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ─────────────────────────────────────────
+// RENDER HISTORY
+// ─────────────────────────────────────────
+function renderHistory() {
+  const list = document.getElementById('log-list');
+  if (state.history.length === 0) {
+    list.innerHTML = '<div class="empty-state">Nenhum trade fechado ainda</div>';
+    return;
+  }
+  list.innerHTML = state.history.map(h => `
+    <div class="log-item">
+      <span class="pos-badge ${h.direction}-badge">${h.direction.toUpperCase()}</span>
+      <span class="log-question">${h.question.substring(0,40)}...</span>
+      <span class="log-pnl ${h.pnl >= 0 ? 'pos' : 'neg'}">${h.pnl >= 0 ? '+' : ''}€${h.pnl.toFixed(2)}</span>
+    </div>
+  `).join('');
+}
+
+// ─────────────────────────────────────────
+// PERFORMANCE
+// ─────────────────────────────────────────
+function updatePerformance() {
+  const h = state.history;
+  if (h.length === 0) return;
+
+  const wins = h.filter(t => t.won).length;
+  const winRate = wins / h.length;
+  const grossProfit = h.filter(t => t.pnl > 0).reduce((a, t) => a + t.pnl, 0);
+  const grossLoss = Math.abs(h.filter(t => t.pnl < 0).reduce((a, t) => a + t.pnl, 0));
+  const pf = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : 0;
+  const avgPnl = h.reduce((a, t) => a + t.pnl, 0) / h.length;
+  const bestWin = Math.max(...h.map(t => t.pnl));
+  const worstLoss = Math.min(...h.map(t => t.pnl));
+
+  // Brier Score
+  const brierScore = h.reduce((acc, t) => {
+    const outcome = t.won ? 1 : 0;
+    return acc + Math.pow(t.p_model - outcome, 2);
+  }, 0) / h.length;
+
+  document.getElementById('p-winrate').textContent = `${(winRate*100).toFixed(1)}%`;
+  document.getElementById('p-winrate').style.color = winRate >= 0.6 ? 'var(--win)' : 'var(--loss)';
+  document.getElementById('p-pf').textContent = isFinite(pf) ? pf.toFixed(2) : '∞';
+  document.getElementById('p-brier').textContent = brierScore.toFixed(3);
+  document.getElementById('p-brier').style.color = brierScore < 0.25 ? 'var(--win)' : 'var(--loss)';
+  document.getElementById('p-bestwin').textContent = `€${bestWin.toFixed(2)}`;
+  document.getElementById('p-bestloss').textContent = `€${worstLoss.toFixed(2)}`;
+  document.getElementById('p-avgpnl').textContent = `€${avgPnl.toFixed(2)}`;
+  document.getElementById('p-avgpnl').style.color = avgPnl >= 0 ? 'var(--win)' : 'var(--loss)';
+
+  drawChart();
+}
+
+function drawChart() {
+  const canvas = document.getElementById('perf-chart');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+
+  const h = state.history.slice().reverse();
+  if (h.length < 2) return;
+
+  let running = 1000;
+  const points = [running];
+  h.forEach(t => { running += t.pnl; points.push(running); });
+
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const range = max - min || 1;
+  const w = canvas.width;
+  const hh = canvas.height;
+  const pad = 20;
+
+  ctx.clearRect(0, 0, w, hh);
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, 0, 0, hh);
+  grad.addColorStop(0, 'rgba(0,255,136,0.2)');
+  grad.addColorStop(1, 'rgba(0,255,136,0)');
+
+  ctx.beginPath();
+  points.forEach((v, i) => {
+    const x = pad + (i / (points.length - 1)) * (w - pad * 2);
+    const y = hh - pad - ((v - min) / range) * (hh - pad * 2);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = '#00ff88';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.lineTo(w - pad, hh - pad);
+  ctx.lineTo(pad, hh - pad);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+}
+
+// ─────────────────────────────────────────
+// HEADER UPDATE
+// ─────────────────────────────────────────
+function updateHeader() {
+  const initBankroll = 1000;
+  const pnl = state.bankroll - initBankroll + state.positions.reduce((a, p) => a, 0);
+  const totalClosed = state.history.reduce((a, h) => a + h.pnl, 0);
+  const wins = state.history.filter(h => h.won).length;
+  const total = state.history.length;
+  const winRate = total > 0 ? `${(wins/total*100).toFixed(0)}%` : '—';
+  const drawdown = state.bankrollPeak > 0 ? (state.bankrollPeak - state.bankroll) / state.bankrollPeak : 0;
+
+  const brierScore = total > 0
+    ? state.history.reduce((acc, t) => acc + Math.pow(t.p_model - (t.won ? 1 : 0), 2), 0) / total
+    : null;
+
+  document.getElementById('bankroll-display').textContent = `€${state.bankroll.toFixed(2).replace('.', ',')}`;
+  const pnlEl = document.getElementById('pnl-display');
+  pnlEl.textContent = `${totalClosed >= 0 ? '+' : ''}€${totalClosed.toFixed(2).replace('.', ',')}`;
+  pnlEl.className = `stat-value ${totalClosed >= 0 ? 'pos' : 'neg'}`;
+  document.getElementById('winrate-display').textContent = winRate;
+  document.getElementById('winrate-display').className = `stat-value ${total > 0 ? (wins/total >= 0.6 ? 'pos' : 'neg') : ''}`;
+  document.getElementById('trades-display').textContent = total;
+  const ddEl = document.getElementById('drawdown-display');
+  ddEl.textContent = `${(drawdown*100).toFixed(1)}%`;
+  ddEl.className = `stat-value ${drawdown >= 0.08 ? 'neg' : drawdown >= 0.04 ? 'warn' : ''}`;
+  document.getElementById('brier-display').textContent = brierScore !== null ? brierScore.toFixed(3) : '—';
+
+  // Atualizar badge de memória
+  const badge = document.getElementById('memory-badge');
+  if (total > 0 || state.positions.length > 0) {
+    badge.textContent = `💾 ${total + state.positions.length} TRADE(S) GUARDADO(S)`;
+    badge.style.background = 'rgba(0,255,136,0.1)';
+    badge.style.borderColor = 'rgba(0,255,136,0.3)';
+    badge.style.color = 'var(--accent)';
+  } else {
+    badge.textContent = '💾 SEM DADOS';
+    badge.style.background = '';
+    badge.style.borderColor = '';
+    badge.style.color = '';
+  }
+}
+
+// ─────────────────────────────────────────
+// TABS
+// ─────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById(`tab-${name}`).classList.add('active');
+  if (name === 'performance') drawChart();
+}
+
+// ─────────────────────────────────────────
+// TOAST
+// ─────────────────────────────────────────
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast show ${type}-toast`;
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ─────────────────────────────────────────
+// RESET
+// ─────────────────────────────────────────
+function resetSimulator() {
+  if (!confirm('Tens a certeza? Isto apaga todos os trades guardados.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  state = { ...STATE_DEFAULT, criadoEm: new Date().toISOString() };
+  updateHeader();
+  renderMarkets();
+  renderPositions();
+  renderHistory();
+  setVerdictNeutral();
+  document.getElementById('selected-market-name').textContent = '← Seleciona um mercado à esquerda';
+  document.getElementById('selected-market-name').style.color = 'var(--muted)';
+  showToast('Simulador reiniciado — memória apagada', 'info');
+}
+
+function setVerdictNeutral() {
+  document.getElementById('verdict-box').className = 'verdict neutral';
+  document.getElementById('verdict-box').textContent = 'Seleciona um mercado e define os parâmetros para ver a análise de risco.';
+  document.getElementById('trade-btn').className = 'submit-btn disabled';
+  document.getElementById('trade-btn').disabled = true;
+  ['k-edge','k-ev','k-kelly','k-suggested','k-gain'].forEach(id => {
+    document.getElementById(id).textContent = '—';
+    document.getElementById(id).className = 'kelly-val';
+  });
+}
+
+// ─────────────────────────────────────────
+// INIT — restaurar estado guardado
+// ─────────────────────────────────────────
+(function init() {
+  const trades = state.history.length;
+  const posicoes = state.positions.length;
+  const temMemoria = trades > 0 || posicoes > 0;
+
+  renderMarkets();
+  updateHeader();
+  renderPositions();
+
+  if (trades > 0) {
+    renderHistory();
+    updatePerformance();
+  }
+
+  if (temMemoria) {
+    const guardadoEm = state.guardadoEm
+      ? new Date(state.guardadoEm).toLocaleString('pt-PT')
+      : '—';
+    showToast(`✓ Memória restaurada · ${trades} trade(s) · última sessão: ${guardadoEm}`, 'info');
+  }
+})();
+</script>
+
+</body>
+</html>
